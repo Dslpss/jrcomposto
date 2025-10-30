@@ -1,10 +1,10 @@
-import NextAuth from "next-auth";
+import NextAuth, { type AuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { connectToDatabase } from "@/lib/mongodb";
 import { User, IUser } from "@/models/User";
 import bcrypt from "bcryptjs";
 
-export const authOptions = {
+export const authOptions: AuthOptions = {
 	providers: [
 		Credentials({
 			name: "Credenciais",
@@ -34,9 +34,9 @@ export const authOptions = {
 	pages: {
 		signIn: "/login",
 	},
-	session: { strategy: "jwt" as const },
-	secret: process.env.NEXTAUTH_SECRET,
-} as const;
+    session: { strategy: "jwt" },
+    secret: process.env.NEXTAUTH_SECRET,
+};
 
 const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
