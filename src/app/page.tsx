@@ -3,9 +3,11 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 export default async function Home() {
-	const session = await getServerSession(authOptions as any);
-	if (session) {
-		redirect("/dashboard");
-	}
-	redirect("/login");
+  const session = await getServerSession(
+    authOptions as unknown as import("next-auth").NextAuthOptions
+  );
+  if (session) {
+    redirect("/dashboard");
+  }
+  redirect("/login");
 }
