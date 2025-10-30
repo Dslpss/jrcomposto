@@ -165,6 +165,15 @@ export function DashboardClient({ userName }: { userName: string }) {
   const [taxaRequerida, setTaxaRequerida] = useState<number | null>(null);
   const [metaMsg, setMetaMsg] = useState<string | null>(null);
 
+  // iniciais do usuário para o avatar no header
+  const initials = useMemo(() => {
+    if (!userName) return "";
+    const parts = userName.trim().split(/\s+/);
+    const a = parts[0]?.charAt(0) ?? "";
+    const b = parts[1]?.charAt(0) ?? "";
+    return (a + b).toUpperCase();
+  }, [userName]);
+
   // Dias concluídos (Set de números) - persistido por cenário em localStorage
   const [completedDays, setCompletedDays] = useState<Set<number>>(new Set());
   // mapa (server) scenarioId -> array de dias concluídos, carregado do backend
@@ -582,17 +591,39 @@ export function DashboardClient({ userName }: { userName: string }) {
 
       <div className="relative mx-auto max-w-6xl p-6 md:p-10">
         <div className="mb-6 flex items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold text-white">Dashboard</h1>
-          <div className="flex items-center gap-3 ml-4 shrink-0">
-            <span className="text-sm text-zinc-300 truncate max-w-40 text-right">
-              {userName}
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-semibold text-white">Dashboard</h1>
+            <span className="hidden sm:inline text-sm text-zinc-400">
+              Gerencie seus cenários
             </span>
-            <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 backdrop-blur transition hover:bg-white/10 shrink-0"
-            >
-              Sair
-            </button>
+          </div>
+
+          <div className="flex items-center gap-3 ml-4 shrink-0">
+            <div className="flex items-center gap-3 rounded-md bg-white/3 px-3 py-1 backdrop-blur-sm">
+              <div className="h-8 w-8 flex items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300 font-semibold text-sm">
+                {initials}
+              </div>
+
+              <div className="hidden sm:flex sm:flex-col sm:items-start">
+                <div className="text-sm text-zinc-100 font-medium truncate max-w-36">
+                  {userName}
+                </div>
+                <button
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  className="text-xs text-zinc-300 hover:text-zinc-100"
+                >
+                  Sair
+                </button>
+              </div>
+
+              {/* botão visível apenas em telas pequenas */}
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="sm:hidden rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 backdrop-blur transition hover:bg-white/10 shrink-0"
+              >
+                Sair
+              </button>
+            </div>
           </div>
         </div>
 
