@@ -153,6 +153,9 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
   const [taxaRequerida, setTaxaRequerida] = useState<number | null>(null);
   const [metaMsg, setMetaMsg] = useState<string | null>(null);
 
+  // Dias concluídos (Set de números) - persistido por cenário em localStorage
+  const [completedDays, setCompletedDays] = useState<Set<number>>(new Set());
+
   function simulateFinal(
     principalNum: number,
     aporteNum: number,
@@ -169,6 +172,64 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
       saldo = saldoFinal;
     }
     return saldo;
+  }
+
+  // Carrega os dias concluídos do localStorage quando o cenário atual muda
+  useEffect(() => {
+    if (!currentScenarioId) {
+      setCompletedDays(new Set());
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(`completed:${currentScenarioId}`);
+      if (!raw) {
+        setCompletedDays(new Set());
+        return;
+      }
+      const arr = JSON.parse(raw) as number[];
+      setCompletedDays(new Set(arr || []));
+    } catch {
+      setCompletedDays(new Set());
+    }
+  }, [currentScenarioId]);
+
+  function persistCompleted(nextSet: Set<number>) {
+    if (!currentScenarioId) return;
+    const arr = Array.from(nextSet.values());
+    try {
+      localStorage.setItem(
+        `completed:${currentScenarioId}`,
+        JSON.stringify(arr)
+      );
+    } catch {
+      // ignore
+    }
+  }
+
+  function toggleDay(dia: number) {
+    setCompletedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(dia)) next.delete(dia);
+      else next.add(dia);
+      persistCompleted(next);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setCompletedDays((prev) => {
+      const next = new Set(prev);
+      const all = cronograma.map((c) => c.dia);
+      const allMarked = all.every((d) => next.has(d));
+      if (allMarked) {
+        // limpar
+        next.clear();
+      } else {
+        all.forEach((d) => next.add(d));
+      }
+      persistCompleted(next);
+      return next;
+    });
   }
 
   /**
@@ -789,6 +850,15 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
             <table className="min-w-full table-auto">
               <thead className="sticky top-0 z-10 bg-white/10 backdrop-blur text-left text-sm text-zinc-200">
                 <tr>
+                  <th className="px-4 py-3">
+                    <button
+                      onClick={toggleAll}
+                      title="Marcar/Desmarcar todos"
+                      className="rounded px-2 py-1 text-sm text-zinc-200 hover:bg-white/5"
+                    >
+                      Concluído
+                    </button>
+                  </th>
                   <th className="px-4 py-3">Dia</th>
                   <th className="px-4 py-3">Saldo inicial</th>
                   <th className="px-4 py-3">Aporte</th>
@@ -797,31 +867,45 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
                 </tr>
               </thead>
               <tbody>
-                {cronograma.map((linha) => (
-                  <tr
-                    key={linha.dia}
-                    className="border-t border-white/10 text-sm"
-                  >
-                    <td className="px-4 py-3 text-zinc-300">{linha.dia}</td>
-                    <td className="px-4 py-3 text-zinc-100">
-                      {formatBRL(linha.saldoInicial)}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-100">
-                      {formatBRL(linha.aporte)}
-                    </td>
-                    <td className="px-4 py-3 text-emerald-300">
-                      {formatBRL(linha.jurosDoDia)}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-zinc-100">
-                      {formatBRL(linha.saldoFinal)}
-                    </td>
-                  </tr>
-                ))}
+                {cronograma.map((linha) => {
+                  const isDone = completedDays.has(linha.dia);
+                  return (
+                    <tr
+                      key={linha.dia}
+                      className={`border-t border-white/10 text-sm ${
+                        isDone ? "opacity-60 line-through" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-3 text-zinc-300">
+                        <input
+                          aria-label={`Marcar dia ${linha.dia} como concluído`}
+                          type="checkbox"
+                          checked={isDone}
+                          onChange={() => toggleDay(linha.dia)}
+                          className="h-4 w-4 rounded border-white/10 text-emerald-400"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-zinc-300">{linha.dia}</td>
+                      <td className="px-4 py-3 text-zinc-100">
+                        {formatBRL(linha.saldoInicial)}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-100">
+                        {formatBRL(linha.aporte)}
+                      </td>
+                      <td className="px-4 py-3 text-emerald-300">
+                        {formatBRL(linha.jurosDoDia)}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-zinc-100">
+                        {formatBRL(linha.saldoFinal)}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {cronograma.length === 0 && (
                   <tr>
                     <td
                       className="px-4 py-6 text-center text-sm text-zinc-400"
-                      colSpan={5}
+                      colSpan={6}
                     >
                       Ajuste os parâmetros para ver o cronograma.
                     </td>
