@@ -171,6 +171,59 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
     return saldo;
   }
 
+  /**
+   * Converte uma string de entrada de moeda/numero para number.
+   * Aceita formatos como:
+   * - "1000.50"
+   * - "1.000,50"
+   * - "R$ 1.000,50"
+   * - "1000,50"
+   */
+  function parseBRLToNumber(input: string | undefined): number {
+    if (!input) return 0;
+    let s = String(input).trim();
+    // remover prefixos/símbolos (R$, espaços)
+    s = s.replace(/[^0-9.,-]/g, "");
+    // se contém '.' e ',' tratar '.' como separador de milhares
+    if (s.indexOf(".") !== -1 && s.indexOf(",") !== -1) {
+      s = s.replace(/\./g, ""); // remove milhares
+      s = s.replace(/,/g, "."); // transforma decimal
+    } else {
+      // se contém apenas vírgula, usa como decimal
+      if (s.indexOf(",") !== -1 && s.indexOf(".") === -1) {
+        s = s.replace(/,/g, ".");
+      }
+      // caso só tenha pontos, assume ponto decimal ou milhares (parseFloat lidará)
+    }
+    const n = Number.parseFloat(s);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  /** Formata valor de entrada como moeda BRL enquanto o usuário digita.
+   * Estratégia: interpretar todos os dígitos como centavos e formatar com Intl.
+   * Ex.: entrada '1234' -> '12,34' exibido como '12,34' ou 'R$ 12,34' dependendo do formatter.
+   */
+  function formatCurrencyInput(raw: string): string {
+    const s = String(raw).trim();
+    if (!s) return "";
+    // se o usuário digitou separador decimal (',' ou '.') consideramos que ele está informando decimais
+    if (/[,\.]/.test(s)) {
+      const n = parseBRLToNumber(s);
+      return new Intl.NumberFormat("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(n);
+    }
+    // caso contrário, trata como número inteiro (unidades) e adiciona centavos .00
+    const digits = s.replace(/\D/g, "");
+    if (!digits) return "";
+    const n = parseInt(digits, 10);
+    return new Intl.NumberFormat("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n);
+  }
+
   function findRequiredDailyRate(
     goal: number,
     principalNum: number,
@@ -253,7 +306,7 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
     setMetaMsg(null);
     setTaxaRequerida(null);
 
-    const goal = Number.parseFloat((metaValor || "").replace(",", ".")) || 0;
+    const goal = parseBRLToNumber(metaValor) || 0;
     const diasMeta = metaDias
       ? Math.max(0, Math.floor(Number((metaDias || "").replace(",", ".") || 0)))
       : parsed.dias;
@@ -611,9 +664,15 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
                 Meta (R$)
               </label>
               <input
-                inputMode="decimal"
+                inputMode="numeric"
                 value={metaValor}
                 onChange={(e) => setMetaValor(e.target.value)}
+                onBlur={() => setMetaValor(formatCurrencyInput(metaValor))}
+                onFocus={() => {
+                  // ao focar, converte para formato editável (número simples)
+                  const n = parseBRLToNumber(metaValor);
+                  setMetaValor(n ? String(n) : "");
+                }}
                 className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100 outline-none transition focus:border-emerald-400/40 focus:ring-2 focus:ring-emerald-400/20"
                 placeholder={formatBRL(totais.saldoFinal)}
               />
@@ -663,10 +722,16 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
                       <tbody>
                         {[-2, -1, 0, 1, 2].map((off) => {
                           const r = taxaRequerida + off / 100;
-                          const diasMetaNum = Math.max(
-                            0,
-                            Math.floor(Number(metaDias || parsed.dias) || 0)
-                          );
+                          const diasMetaNum = metaDias
+                            ? Math.max(
+                                0,
+                                Math.floor(
+                                  Number(
+                                    (metaDias || "").replace(",", ".") || 0
+                                  )
+                                )
+                              )
+                            : parsed.dias;
                           const finalVal = simulateFinal(
                             parsed.principal,
                             parsed.aporte,

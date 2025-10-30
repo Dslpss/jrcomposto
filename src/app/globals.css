@@ -5,12 +5,7 @@
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* removed @theme rule (unsupported); keep variables on :root only */
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -24,3 +19,47 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Ajustes responsivos específicos para aparelhos ~6.5" (ex.: Poco F5 2400x1080) */
+@media (max-width: 420px) {
+  /* levemente menor fonte base para caber melhor */
+  html { font-size: 14px; }
+
+  /* Containers principais: reduzir padding e usar largura total */
+  .max-w-6xl { max-width: 100% !important; padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+  .p-6 { padding: 0.75rem !important; }
+  .p-5 { padding: 0.625rem !important; }
+  .md\:p-10 { padding: 0.75rem !important; }
+
+  /* Cards: reduzir espaçamento e bordas arredondadas */
+  .rounded-2xl { border-radius: 0.75rem !important; }
+  .backdrop-blur-md { backdrop-filter: blur(6px) !important; }
+
+  /* Gráficos: reduzir altura para caber na tela pequena */
+  .h-64 { height: 220px !important; }
+  .h-72 { height: 260px !important; }
+
+  /* Inputs e botões um pouco menores */
+  input, select, button, textarea {
+    font-size: 0.95rem !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  /* Tabela: reduzir fonte e espaçamento */
+  table td, table th { font-size: 0.85rem !important; padding: 0.5rem !important; }
+
+  /* Ajuste para evitar altura mínima excessiva em telas pequenas */
+  .min-h-screen { min-height: auto !important; }
+}
+
+/* Classe utilitária enviada pelo usuário (estilização de listas) adaptada */
+.f5cPye ul{font-size:var(--m3t7,0.95rem);line-height:var(--m3t8,1.2);margin:10px 0 20px 0;padding-inline-start:24px}
+.f5cPye .WaaZC:first-of-type ul:first-child{margin-top:0}
+.f5cPye ul.qh1nvc{font-size:var(--m3t7,0.95rem);line-height:var(--m3t8,1.2)}
+.f5cPye li{padding-inline-start:4px;margin-bottom:8px;list-style:inherit}
+.f5cPye li.K3KsMc{list-style-type:none}
+.f5cPye ul>li:last-child,.f5cPye ol>li:last-child,.f5cPye ul>.bsmXxe:last-child>li,.f5cPye ol>.bsmXxe:last-child>li{margin-bottom:0}
+
