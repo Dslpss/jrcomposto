@@ -206,12 +206,35 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
     }
   }
 
+  // Persiste os dias concluídos no backend (usa o mesmo contrato de /api/user-data)
+  async function persistCompletedServer(nextSet: Set<number>) {
+    if (!currentScenarioId) return;
+    const arr = Array.from(nextSet.values());
+    const payload = {
+      scenarios,
+      currentScenarioId,
+      // adiciona um campo 'completedDays' no objeto data armazenado no usuário
+      completedDays: { [currentScenarioId]: arr },
+    };
+    try {
+      // fire-and-forget, não bloqueia a UI; mas captura falhas silenciosamente
+      await fetch("/api/user-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      // não interrompe a UX se falhar
+    }
+  }
+
   function toggleDay(dia: number) {
     setCompletedDays((prev) => {
       const next = new Set(prev);
       if (next.has(dia)) next.delete(dia);
       else next.add(dia);
       persistCompleted(next);
+      void persistCompletedServer(next);
       return next;
     });
   }
@@ -228,6 +251,7 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
         all.forEach((d) => next.add(d));
       }
       persistCompleted(next);
+      void persistCompletedServer(next);
       return next;
     });
   }
@@ -856,7 +880,12 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
                       title="Marcar/Desmarcar todos"
                       className="rounded px-2 py-1 text-sm text-zinc-200 hover:bg-white/5"
                     >
-                      Concluído
+                        <span className="mr-2">Concluído</span>
+                        {cronograma.length > 0 && (
+                          <span className="inline-block rounded-full bg-white/10 px-2 py-0.5 text-xs font-medium text-zinc-200">
+                            {completedDays.size}/{cronograma.length}
+                          </span>
+                        )}
                     </button>
                   </th>
                   <th className="px-4 py-3">Dia</th>
