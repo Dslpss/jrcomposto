@@ -1,6 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   Chart as ChartJS,
@@ -598,6 +599,11 @@ export function DashboardClient({ userName }: { userName: string }) {
             <span className="hidden sm:inline text-sm text-zinc-400">
               Gerencie seus cenários
             </span>
+            <Link href="/dashboard/expenses">
+              <button className="ml-2 inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-200 hover:bg-white/10">
+                Gastos
+              </button>
+            </Link>
           </div>
 
           <div className="flex items-center gap-3 ml-4 shrink-0">
