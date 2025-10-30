@@ -88,7 +88,8 @@ body {
 @media (max-width: 540px) {
   /* Para o card planejador, tentar manter os controles na mesma linha: 3 colunas proporcionais */
   .planejador-meta .grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    /* Dar mais espaço ao primeiro input em telas pequenas para evitar quebra de linha */
+    grid-template-columns: 2fr 1fr auto !important;
     gap: 0.5rem !important;
     align-items: end !important;
   }
