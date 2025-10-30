@@ -36,7 +36,8 @@ export const authOptions: AuthOptions = {
 	},
 	    session: { strategy: "jwt" },
 	    secret: process.env.NEXTAUTH_SECRET,
-	    trustHost: true,
+	    // garante cookie seguro em produção (HTTPS)
+	    useSecureCookies: Boolean(process.env.NEXTAUTH_URL?.startsWith("https://")),
 };
 
 const handler = NextAuth(authOptions);
