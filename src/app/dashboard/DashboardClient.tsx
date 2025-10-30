@@ -57,6 +57,9 @@ export function DashboardClient({ userName }: { userName: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<
+    "idle" | "syncing" | "saved" | "error"
+  >("idle");
 
   // múltiplos cenários
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
@@ -249,7 +252,8 @@ export function DashboardClient({ userName }: { userName: string }) {
       completedDays: { [currentScenarioId]: arr },
     };
     try {
-      // fire-and-forget, não bloqueia a UI; mas captura falhas silenciosamente
+      // set sync indicator
+      setSyncStatus("syncing");
       const res = await fetch("/api/user-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -261,8 +265,13 @@ export function DashboardClient({ userName }: { userName: string }) {
           ...prev,
           [currentScenarioId]: arr,
         }));
+        setSyncStatus("saved");
+        setTimeout(() => setSyncStatus("idle"), 1200);
+      } else {
+        setSyncStatus("error");
       }
     } catch {
+      setSyncStatus("error");
       // não interrompe a UX se falhar
     }
   }
@@ -463,12 +472,23 @@ export function DashboardClient({ userName }: { userName: string }) {
       scenarios: next?.scenarios ?? scenarios,
       currentScenarioId: next?.currentScenarioId ?? currentScenarioId,
     };
-    const res = await fetch("/api/user-data", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error("Falha ao salvar");
+    try {
+      setSyncStatus("syncing");
+      const res = await fetch("/api/user-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        setSyncStatus("error");
+        throw new Error("Falha ao salvar");
+      }
+      setSyncStatus("saved");
+      setTimeout(() => setSyncStatus("idle"), 1200);
+    } catch (e) {
+      // rethrow so callers can handle
+      throw e;
+    }
   }
 
   async function handleSave() {
@@ -607,6 +627,92 @@ export function DashboardClient({ userName }: { userName: string }) {
           </div>
 
           <div className="flex items-center gap-3 ml-4 shrink-0">
+            <div className="hidden sm:flex items-center gap-3 mr-2 text-sm text-zinc-300">
+              <span className="w-4 h-4 inline-block">
+                {syncStatus === "syncing" ? (
+                  <svg
+                    className="animate-spin text-zinc-300"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      strokeOpacity="0.2"
+                    />
+                    <path
+                      d="M22 12a10 10 0 00-10-10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                ) : syncStatus === "saved" ? (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="text-emerald-300"
+                  >
+                    <path
+                      d="M20 6L9 17l-5-5"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : syncStatus === "error" ? (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="text-rose-400"
+                  >
+                    <path
+                      d="M18 6L6 18M6 6l12 12"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="text-zinc-400"
+                  >
+                    <path
+                      d="M12 6v6l4 2"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="9"
+                      stroke="currentColor"
+                      strokeWidth="1"
+                      strokeOpacity="0.2"
+                    />
+                  </svg>
+                )}
+              </span>
+              <span className="whitespace-nowrap">
+                {syncStatus === "syncing" && "Sincronizando..."}
+                {syncStatus === "saved" && "Salvo"}
+                {syncStatus === "error" && "Erro ao salvar"}
+                {syncStatus === "idle" && "Sincronizado"}
+              </span>
+            </div>
             <div className="flex items-center gap-3 rounded-md bg-white/3 px-3 py-1 backdrop-blur-sm">
               <div className="h-8 w-8 flex items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300 font-semibold text-sm">
                 {initials}
