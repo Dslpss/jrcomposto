@@ -132,12 +132,18 @@ export default function ExpensesClient() {
   const [amount, setAmount] = useState<string>("");
   const [category, setCategory] = useState("");
   const [recurringChecked, setRecurringChecked] = useState(false);
-  const [paymentDay, setPaymentDay] = useState<number>(() =>
+  const [paymentDay, setPaymentDay] = useState<number | string>(() =>
     new Date().getDate()
   );
   const [showConfirmApplyAll, setShowConfirmApplyAll] = useState(false);
   const [showInfoApplyAll, setShowInfoApplyAll] = useState(false);
   const [isAddingExpense, setIsAddingExpense] = useState(false);
+  // flag para evitar mismatches de hidratação: só mostrar conteúdos dependentes de localStorage
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
   const [expenses, setExpenses] = useState<Expense[]>(() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -270,7 +276,7 @@ export default function ExpensesClient() {
       currency: "BRL",
     }).format(v);
 
-  const addExpense = () => {
+  const addExpense = async () => {
     if (isAddingExpense) return;
     setIsAddingExpense(true);
     try {
@@ -281,7 +287,9 @@ export default function ExpensesClient() {
           .replace(",", ".")
       );
       if (!name || !parsed || Number.isNaN(parsed)) return;
-      // se marcada como recorrente, criar template primeiro para referenciar seu id
+
+      // cria template recorrente quando marcado (persistência do template fica a cargo do sync completo)
+      let createdExpense: Expense | null = null;
       if (recurringChecked) {
         const r: RecurringExpense = {
           id: generateId(),
@@ -309,6 +317,7 @@ export default function ExpensesClient() {
         };
         setExpenses((s) => [e, ...s]);
         setRecurringChecked(false);
+        createdExpense = e;
       } else {
         const e: Expense = {
           id: generateId(),
@@ -320,7 +329,35 @@ export default function ExpensesClient() {
           date: new Date().toISOString(),
         };
         setExpenses((s) => [e, ...s]);
+        createdExpense = e;
       }
+
+      // tentar persistir o novo lançamento no servidor de forma incremental
+      if (createdExpense) {
+        try {
+          const res = await fetch("/api/expenses", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: createdExpense.id,
+              name: createdExpense.name,
+              amount: createdExpense.amount,
+              category: createdExpense.category,
+              date: createdExpense.date,
+              recurringId: createdExpense.recurringId,
+            }),
+          });
+          if (!res.ok) {
+            setSyncStatus("error");
+          } else {
+            setSyncStatus("saved");
+            window.setTimeout(() => setSyncStatus("idle"), 1500);
+          }
+        } catch {
+          setSyncStatus("error");
+        }
+      }
+
       setName("");
       setAmount("");
       setCategory("");
@@ -472,9 +509,13 @@ export default function ExpensesClient() {
 
   // ordenar categorias predefinidas pela contagem (desc) para mostrar chips mais usados primeiro
   const sortedPredefined = useMemo(() => {
-    return predefinedCategories
-      .slice()
-      .sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0));
+    const indexMap: Record<string, number> = {};
+    predefinedCategories.forEach((c, i) => (indexMap[c] = i));
+    return predefinedCategories.slice().sort((a, b) => {
+      const diff = (categoryCounts[b] || 0) - (categoryCounts[a] || 0);
+      if (diff !== 0) return diff;
+      return (indexMap[a] || 0) - (indexMap[b] || 0);
+    });
   }, [categoryCounts, predefinedCategories]);
 
   // Gastos por mês (últimos 6 meses)
@@ -705,10 +746,12 @@ export default function ExpensesClient() {
   return (
     <div className="space-y-4">
       {/* Card principal: formulário e resumo */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-medium text-white">Gestão de Gastos</h2>
-          <div className="flex items-center gap-2 text-sm text-zinc-300">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-md max-w-[360px] mx-auto sm:max-w-full">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm sm:text-lg font-medium text-white">
+            Gestão de Gastos
+          </h2>
+          <div className="hidden sm:flex items-center gap-2 text-sm text-zinc-300">
             {/* Sync indicator */}
             <div className="flex items-center gap-2">
               <span className="w-4 h-4 inline-block">
@@ -789,7 +832,7 @@ export default function ExpensesClient() {
                   </svg>
                 )}
               </span>
-              <span className="whitespace-nowrap">
+              <span className="hidden sm:inline-block whitespace-nowrap">
                 {syncStatus === "syncing" && "Sincronizando..."}
                 {syncStatus === "saved" && "Salvo"}
                 {syncStatus === "error" && "Erro ao salvar"}
@@ -799,7 +842,7 @@ export default function ExpensesClient() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 mb-4">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3 mb-3">
           <div className="col-span-1 md:col-span-1">
             <label className="mb-1 block text-sm text-zinc-300">
               Renda mensal (R$)
@@ -808,7 +851,7 @@ export default function ExpensesClient() {
               inputMode="decimal"
               value={income}
               onChange={(e) => setIncome(Number(e.target.value || 0))}
-              className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100 outline-none"
+              className="w-full rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-zinc-100 outline-none"
             />
           </div>
 
@@ -820,48 +863,50 @@ export default function ExpensesClient() {
               inputMode="decimal"
               value={savingGoal}
               onChange={(e) => setSavingGoal(Number(e.target.value || 0))}
-              className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100 outline-none"
+              className="w-full rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-zinc-100 outline-none"
             />
           </div>
 
           <div className="col-span-1 md:col-span-1" />
         </div>
 
-        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-4">
+        <div className="mb-4 flex flex-col gap-1 sm:grid sm:grid-cols-4 sm:gap-2">
           <input
             placeholder="Nome do gasto"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="col-span-2 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100"
+            className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-zinc-100"
           />
           <input
             placeholder="Valor (R$)"
             inputMode="decimal"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100"
+            className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-zinc-100"
           />
           <input
             placeholder="Categoria"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100"
+            className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-zinc-100"
           />
-          <div className="col-span-4 mt-2 flex flex-wrap gap-2">
+          <div className="col-span-4 mt-2 grid grid-cols-2 gap-x-1 gap-y-1 sm:flex sm:flex-wrap sm:gap-2 sm:justify-start min-w-0">
             {sortedPredefined.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => setCategory(c)}
-                className={`flex items-center gap-2 text-xs px-2 py-1 rounded-full transition-all ${
+                className={`w-full sm:w-auto sm:flex-none min-w-0 inline-flex items-center gap-0.5 text-xs sm:text-sm md:text-base px-0 sm:px-2 py-0.5 sm:py-1 rounded-sm transition-all overflow-hidden max-w-none sm:max-w-40 ${
                   category === c
                     ? "bg-emerald-500 text-white"
                     : "bg-white/5 text-zinc-200 hover:bg-white/10"
                 }`}
               >
-                <span>{c}</span>
-                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/10 text-[10px] text-zinc-200">
-                  {categoryCounts[c] || 0}
+                <span className="inline-flex shrink-0 mr-1 px-0.5 sm:px-2 py-0 sm:py-0.5 rounded-full bg-white/10 text-[9px] sm:text-xs text-zinc-200">
+                  {isClient ? categoryCounts[c] || 0 : "\u00A0"}
+                </span>
+                <span className="truncate max-w-[120px] sm:max-w-[140px] min-w-0 text-left text-[9px] sm:text-sm">
+                  {c}
                 </span>
               </button>
             ))}
@@ -886,7 +931,10 @@ export default function ExpensesClient() {
                 max={31}
                 value={paymentDay}
                 onChange={(e) =>
-                  setPaymentDay(Number(e.target.value || new Date().getDate()))
+                  // allow clearing the input on mobile/desktop by accepting empty string
+                  setPaymentDay(
+                    e.target.value === "" ? "" : Number(e.target.value)
+                  )
                 }
                 className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100"
               />
@@ -895,20 +943,23 @@ export default function ExpensesClient() {
           {/* botão removido daqui — realocado abaixo do resumo */}
         </div>
 
-        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-4">
-          <div className="p-3 rounded-lg bg-white/3">
+        <div className="mb-3 grid grid-cols-1 gap-1 sm:gap-2 sm:grid-cols-4">
+          <div className="p-2 sm:p-3 rounded-lg bg-white/3">
             <div className="text-sm text-zinc-300">Renda</div>
-            <div className="font-medium text-zinc-100">{formatBRL(income)}</div>
+            <div suppressHydrationWarning className="font-medium text-zinc-100">
+              {formatBRL(income)}
+            </div>
           </div>
-          <div className="p-3 rounded-lg bg-white/3">
+          <div className="p-2 sm:p-3 rounded-lg bg-white/3">
             <div className="text-sm text-zinc-300">Total gastos</div>
-            <div className="font-medium text-zinc-100">
+            <div suppressHydrationWarning className="font-medium text-zinc-100">
               {formatBRL(totals.totalExpenses)}
             </div>
           </div>
-          <div className="p-3 rounded-lg bg-white/3">
+          <div className="p-2 sm:p-3 rounded-lg bg-white/3">
             <div className="text-sm text-zinc-300">Saldo</div>
             <div
+              suppressHydrationWarning
               className={`font-medium ${
                 totals.balance < 0 ? "text-rose-400" : "text-emerald-300"
               }`}
@@ -916,26 +967,30 @@ export default function ExpensesClient() {
               {formatBRL(totals.balance)}
             </div>
           </div>
-          <div className="p-3 rounded-lg bg-white/3">
+          <div className="p-2 sm:p-3 rounded-lg bg-white/3">
             <div className="text-sm text-zinc-300">Meta economia</div>
-            <div className="font-medium text-zinc-100">
+            <div suppressHydrationWarning className="font-medium text-zinc-100">
               {formatBRL(savingGoal)}
             </div>
             <div className="text-sm mt-1">
-              {savingGoal <= 0 ? (
-                <span className="text-zinc-400">Defina uma meta</span>
-              ) : savingGoal - totals.balance <= 0 ? (
-                <span className="text-emerald-300">Meta atingida</span>
+              {isClient ? (
+                savingGoal <= 0 ? (
+                  <span className="text-zinc-400">Defina uma meta</span>
+                ) : savingGoal - totals.balance <= 0 ? (
+                  <span className="text-emerald-300">Meta atingida</span>
+                ) : (
+                  <span className="text-amber-300">
+                    Faltam {formatBRL(savingGoal - totals.balance)}
+                  </span>
+                )
               ) : (
-                <span className="text-amber-300">
-                  Faltam {formatBRL(savingGoal - totals.balance)}
-                </span>
+                <span className="text-zinc-400">&nbsp;</span>
               )}
             </div>
           </div>
         </div>
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex justify-center sm:justify-end">
           <button
             onClick={addExpense}
             disabled={
@@ -964,7 +1019,7 @@ export default function ExpensesClient() {
                 )
               )
             }
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${
+            className={`w-full sm:w-auto rounded-lg px-4 py-2 text-sm font-medium text-white ${
               isAddingExpense
                 ? "bg-emerald-600 opacity-90"
                 : "bg-emerald-500 hover:bg-emerald-600"
@@ -1190,34 +1245,42 @@ export default function ExpensesClient() {
         </div>
 
         <div className="grid gap-2">
-          {warnings.map((w, i) => (
-            <div
-              key={i}
-              className={`flex items-start gap-3 rounded-md p-3 ${
-                w.level === "critical"
-                  ? "bg-rose-900/30 border border-rose-700"
-                  : w.level === "warning"
-                  ? "bg-amber-900/25 border border-amber-700"
-                  : "bg-emerald-900/10 border border-emerald-700/20"
-              }`}
-            >
-              <div className="mt-0.5">
-                {w.level === "critical" ? (
-                  <span className="text-rose-400">●</span>
-                ) : w.level === "warning" ? (
-                  <span className="text-amber-300">●</span>
-                ) : (
-                  <span className="text-emerald-300">●</span>
-                )}
+          {isClient ? (
+            warnings.map((w, i) => (
+              <div
+                key={i}
+                className={`flex items-start gap-3 rounded-md p-3 ${
+                  w.level === "critical"
+                    ? "bg-rose-900/30 border border-rose-700"
+                    : w.level === "warning"
+                    ? "bg-amber-900/25 border border-amber-700"
+                    : "bg-emerald-900/10 border border-emerald-700/20"
+                }`}
+              >
+                <div className="mt-0.5">
+                  {w.level === "critical" ? (
+                    <span className="text-rose-400">●</span>
+                  ) : w.level === "warning" ? (
+                    <span className="text-amber-300">●</span>
+                  ) : (
+                    <span className="text-emerald-300">●</span>
+                  )}
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-white">
+                    {w.title}
+                  </div>
+                  {w.detail && (
+                    <div className="text-xs text-zinc-400 mt-1">{w.detail}</div>
+                  )}
+                </div>
               </div>
-              <div>
-                <div className="text-sm font-medium text-white">{w.title}</div>
-                {w.detail && (
-                  <div className="text-xs text-zinc-400 mt-1">{w.detail}</div>
-                )}
-              </div>
+            ))
+          ) : (
+            <div className="text-sm text-zinc-400">
+              Carregando recomendações...
             </div>
-          ))}
+          )}
         </div>
       </div>
 
