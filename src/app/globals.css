@@ -22,7 +22,8 @@ body {
 
 /* Animação do gradiente para o título Dashboard */
 @keyframes gradient {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% 50%;
   }
   50% {
@@ -162,4 +163,64 @@ body {
 .f5cPye ul > .bsmXxe:last-child > li,
 .f5cPye ol > .bsmXxe:last-child > li {
   margin-bottom: 0;
+}
+
+/* --- EFEITO NEON + PONTEIRO ANIMADO (para destacar elemento de navegação) --- */
+@keyframes neonPulse {
+  0% {
+    box-shadow: 0 0 6px rgba(56, 189, 248, 0.35),
+      0 0 12px rgba(56, 189, 248, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.9),
+      0 0 36px rgba(56, 189, 248, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 6px rgba(56, 189, 248, 0.35),
+      0 0 12px rgba(56, 189, 248, 0.18);
+  }
+}
+
+.neon-btn {
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  /* slight inward glow to blend with current theme */
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.12);
+}
+.neon-btn.glow {
+  animation: neonPulse 2.4s ease-in-out infinite;
+  transform: translateZ(0);
+}
+
+@keyframes pointer-bounce {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  40% {
+    transform: translateY(-6px) rotate(-10deg);
+    opacity: 1;
+  }
+  80% {
+    transform: translateY(-2px) rotate(-4deg);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.neon-pointer {
+  display: inline-block;
+  color: #67e8f9; /* cyan-300 */
+  filter: drop-shadow(0 6px 14px rgba(56, 189, 248, 0.18));
+  transform-origin: center;
+  animation: pointer-bounce 1.6s cubic-bezier(0.2, 0.9, 0.3, 1) infinite;
+}
+
+/* Ajuste responsivo: esconder ponteiro em telas muito pequenas */
+@media (max-width: 420px) {
+  .neon-pointer {
+    display: none;
+  }
 }

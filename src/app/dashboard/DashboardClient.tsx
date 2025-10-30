@@ -620,9 +620,28 @@ export function DashboardClient({ userName }: { userName: string }) {
               Gerencie seus cenários
             </span>
             <Link href="/dashboard/expenses">
-              <button className="ml-2 inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-200 hover:bg-white/10">
-                Gastos
-              </button>
+              <div className="relative ml-2 inline-flex items-center">
+                <button className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-200 hover:bg-white/10 neon-btn glow">
+                  Gastos
+                </button>
+
+                {/* Ponteiro animado que chama atenção para a página de Gastos (posicionado à direita, apontando para a esquerda) */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="neon-pointer absolute -right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-cyan-300"
+                  aria-hidden
+                >
+                  {/* Seta simples apontando para a esquerda */}
+                  <path d="M19 12H6" />
+                  <path d="M12 19l-7-7 7-7" />
+                </svg>
+              </div>
             </Link>
           </div>
 
