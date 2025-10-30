@@ -6,5 +6,5 @@ import { DashboardClient } from "./DashboardClient";
 export default async function DashboardPage() {
 	const session = await getServerSession(authOptions as any);
 	if (!session) redirect("/login");
-	return <DashboardClient userEmail={session.user?.email ?? ""} />;
+	return <DashboardClient userEmail={(session as any).user?.email ?? ""} />;
 }
