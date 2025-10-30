@@ -592,7 +592,9 @@ export function DashboardClient({ userName }: { userName: string }) {
       <div className="relative mx-auto max-w-6xl p-6 md:p-10">
         <div className="mb-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold text-white">Dashboard</h1>
+            <h1 className="text-3xl font-bold bg-linear-to-r from-emerald-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent animate-gradient drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]">
+              Dashboard
+            </h1>
             <span className="hidden sm:inline text-sm text-zinc-400">
               Gerencie seus cenários
             </span>

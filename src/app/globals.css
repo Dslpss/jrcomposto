@@ -20,6 +20,21 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Animação do gradiente para o título Dashboard */
+@keyframes gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 3s ease infinite;
+}
+
 /* Ajustes responsivos específicos para aparelhos ~6.5" (ex.: Poco F5 2400x1080) */
 @media (max-width: 420px) {
   /* levemente menor fonte base para caber melhor */
