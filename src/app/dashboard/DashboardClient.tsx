@@ -99,7 +99,19 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
         }
         const list: Scenario[] = Array.isArray(d.scenarios) ? d.scenarios : [];
         setScenarios(list);
-        setCurrentScenarioId(d.currentScenarioId ?? list[0]?.id ?? null);
+        const chosenId = d.currentScenarioId ?? list[0]?.id ?? null;
+        setCurrentScenarioId(chosenId);
+        // se o backend trouxe um mapa de dias concluídos, armazena-o e aplica para o cenário atual
+        if (d.completedDays && typeof d.completedDays === "object") {
+          try {
+            setServerCompletedMap(d.completedDays as Record<string, number[]>);
+            if (chosenId && Array.isArray(d.completedDays[chosenId])) {
+              setCompletedDays(new Set(d.completedDays[chosenId] || []));
+            }
+          } catch {
+            // ignore formato inesperado
+          }
+        }
       } finally {
         setLoading(false);
       }
@@ -155,6 +167,10 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
 
   // Dias concluídos (Set de números) - persistido por cenário em localStorage
   const [completedDays, setCompletedDays] = useState<Set<number>>(new Set());
+  // mapa (server) scenarioId -> array de dias concluídos, carregado do backend
+  const [serverCompletedMap, setServerCompletedMap] = useState<
+    Record<string, number[]>
+  >({});
 
   function simulateFinal(
     principalNum: number,
@@ -174,10 +190,16 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
     return saldo;
   }
 
-  // Carrega os dias concluídos do localStorage quando o cenário atual muda
+  // Ao mudar de cenário, prefere dados do servidor (serverCompletedMap) se disponíveis;
+  // caso contrário, faz fallback para localStorage.
   useEffect(() => {
     if (!currentScenarioId) {
       setCompletedDays(new Set());
+      return;
+    }
+    const fromServer = serverCompletedMap[currentScenarioId];
+    if (Array.isArray(fromServer)) {
+      setCompletedDays(new Set(fromServer));
       return;
     }
     try {
@@ -191,7 +213,7 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
     } catch {
       setCompletedDays(new Set());
     }
-  }, [currentScenarioId]);
+  }, [currentScenarioId, serverCompletedMap]);
 
   function persistCompleted(nextSet: Set<number>) {
     if (!currentScenarioId) return;
@@ -218,11 +240,18 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
     };
     try {
       // fire-and-forget, não bloqueia a UI; mas captura falhas silenciosamente
-      await fetch("/api/user-data", {
+      const res = await fetch("/api/user-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (res.ok) {
+        // atualiza o mapa local do servidor para refletir a mudança imediatamente
+        setServerCompletedMap((prev) => ({
+          ...prev,
+          [currentScenarioId]: arr,
+        }));
+      }
     } catch {
       // não interrompe a UX se falhar
     }
@@ -880,12 +909,12 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
                       title="Marcar/Desmarcar todos"
                       className="rounded px-2 py-1 text-sm text-zinc-200 hover:bg-white/5"
                     >
-                        <span className="mr-2">Concluído</span>
-                        {cronograma.length > 0 && (
-                          <span className="inline-block rounded-full bg-white/10 px-2 py-0.5 text-xs font-medium text-zinc-200">
-                            {completedDays.size}/{cronograma.length}
-                          </span>
-                        )}
+                      <span className="mr-2">Concluído</span>
+                      {cronograma.length > 0 && (
+                        <span className="inline-block rounded-full bg-white/10 px-2 py-0.5 text-xs font-medium text-zinc-200">
+                          {completedDays.size}/{cronograma.length}
+                        </span>
+                      )}
                     </button>
                   </th>
                   <th className="px-4 py-3">Dia</th>
