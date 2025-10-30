@@ -581,13 +581,15 @@ export function DashboardClient({ userName }: { userName: string }) {
       <div className="pointer-events-none absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-fuchsia-500/10 blur-3xl" />
 
       <div className="relative mx-auto max-w-6xl p-6 md:p-10">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-6 flex items-center justify-between gap-3">
           <h1 className="text-xl font-semibold text-white">Dashboard</h1>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-zinc-300">{userName}</span>
+          <div className="flex items-center gap-3 ml-4 shrink-0">
+            <span className="text-sm text-zinc-300 truncate max-w-40 text-right">
+              {userName}
+            </span>
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 backdrop-blur transition hover:bg-white/10"
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 backdrop-blur transition hover:bg-white/10 shrink-0"
             >
               Sair
             </button>
