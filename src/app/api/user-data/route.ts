@@ -25,6 +25,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await req.json();
   await connectToDatabase();
-  await User.updateOne({ email: session.user.email }, { $set: { data: body } });
+  try {
+    // busca o documento atual para evitar sobrescrever campos não enviados
+    const existing = await User.findOne({ email: session.user.email }).lean<
+      IUser & { _id?: unknown }
+    >();
+    const existingData = (existing && (existing as IUser).data) || {};
+    // faz merge raso: campos enviados substituem os existentes; campos não enviados são preservados
+    const merged = { ...existingData, ...(body || {}) };
+    await User.updateOne(
+      { email: session.user.email },
+      { $set: { data: merged } }
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: msg ?? "Server error" }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }
