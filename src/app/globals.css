@@ -84,6 +84,41 @@ body {
   }
 }
 
+/* Regras adicionais para cobrir aparelhos com larguras até 540px (Poco F5 e variações) */
+@media (max-width: 540px) {
+  /* Para o card planejador, tentar manter os controles na mesma linha: 3 colunas proporcionais */
+  .planejador-meta .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0.5rem !important;
+    align-items: end !important;
+  }
+
+  /* permitir que inputs ocupem o espaço disponível e o botão mantenha tamanho natural */
+  .planejador-meta .col-span-1,
+  .planejador-meta .col-span-2,
+  .planejador-meta .col-span-3 {
+    width: 100% !important;
+  }
+
+  .planejador-meta input {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .planejador-meta .flex.items-end {
+    display: flex !important;
+    align-items: flex-end !important;
+  }
+  .planejador-meta .flex.items-end button {
+    width: auto !important;
+  }
+
+  /* pequenos ajustes para ícones/labels que possam empurrar o layout */
+  .planejador-meta .inline-icon,
+  .planejador-meta .leading-icon {
+    margin-right: 0.5rem !important;
+  }
+}
+
 /* Classe utilitária enviada pelo usuário (estilização de listas) adaptada */
 .f5cPye ul {
   font-size: var(--m3t7, 0.95rem);
