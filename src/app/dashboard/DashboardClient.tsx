@@ -52,7 +52,7 @@ function formatBRL(value: number) {
   }).format(value);
 }
 
-export function DashboardClient({ userEmail }: { userEmail: string }) {
+export function DashboardClient({ userName }: { userName: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -533,7 +533,7 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
     doc.text(title, margin, 40);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
-    doc.text(`Usuário: ${userEmail}`, margin, 60);
+    doc.text(`Usuário: ${userName}`, margin, 60);
     doc.text(
       `Parâmetros: Valor Inicial ${formatBRL(parsed.principal)} | Taxa ${(
         parsed.taxa * 100
@@ -584,7 +584,7 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl font-semibold text-white">Dashboard</h1>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-zinc-300">{userEmail}</span>
+            <span className="text-sm text-zinc-300">{userName}</span>
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 backdrop-blur transition hover:bg-white/10"

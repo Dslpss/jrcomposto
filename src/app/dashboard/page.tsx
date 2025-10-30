@@ -8,11 +8,11 @@ export default async function DashboardPage() {
     authOptions as unknown as import("next-auth").NextAuthOptions
   );
   if (!session) redirect("/login");
-  return (
-    <DashboardClient
-      userEmail={
-        (session as unknown as { user?: { email?: string } })?.user?.email ?? ""
-      }
-    />
-  );
+  const nameOrEmail =
+    (session as unknown as { user?: { name?: string; email?: string } })?.user
+      ?.name ??
+    (session as unknown as { user?: { name?: string; email?: string } })?.user
+      ?.email ??
+    "";
+  return <DashboardClient userName={nameOrEmail} />;
 }
