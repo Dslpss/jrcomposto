@@ -168,7 +168,9 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
   // Dias concluídos (Set de números) - persistido por cenário em localStorage
   const [completedDays, setCompletedDays] = useState<Set<number>>(new Set());
   // mapa (server) scenarioId -> array de dias concluídos, carregado do backend
-  const [serverCompletedMap, setServerCompletedMap] = useState<Record<string, number[]>>({});
+  const [serverCompletedMap, setServerCompletedMap] = useState<
+    Record<string, number[]>
+  >({});
 
   function simulateFinal(
     principalNum: number,
@@ -245,7 +247,10 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
       });
       if (res.ok) {
         // atualiza o mapa local do servidor para refletir a mudança imediatamente
-        setServerCompletedMap((prev) => ({ ...prev, [currentScenarioId]: arr }));
+        setServerCompletedMap((prev) => ({
+          ...prev,
+          [currentScenarioId]: arr,
+        }));
       }
     } catch {
       // não interrompe a UX se falhar
