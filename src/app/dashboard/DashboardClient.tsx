@@ -768,7 +768,7 @@ export function DashboardClient({ userName }: { userName: string }) {
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
+        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md planejador-meta">
           <h2 className="mb-4 text-lg font-medium text-white">
             Planejador de Meta
           </h2>
