@@ -533,7 +533,7 @@ export function DashboardClient({ userName }: { userName: string }) {
     doc.text(title, margin, 40);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
-  doc.text(`Usuário: ${userName}`, margin, 60);
+    doc.text(`Usuário: ${userName}`, margin, 60);
     doc.text(
       `Parâmetros: Valor Inicial ${formatBRL(parsed.principal)} | Taxa ${(
         parsed.taxa * 100
