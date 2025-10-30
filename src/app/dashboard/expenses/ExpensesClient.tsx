@@ -27,6 +27,16 @@ type Expense = {
   amount: number;
   category?: string;
   date: string;
+  recurringId?: string;
+};
+
+type RecurringExpense = {
+  id: string;
+  name: string;
+  amount: number;
+  category?: string;
+  cadence: "monthly"; // for now only monthly
+  paymentDay?: number; // dia do pagamento (1-31)
 };
 
 // categorias predefinidas (constante de módulo para estabilidade)
@@ -42,104 +52,14 @@ const PREDEFINED_CATEGORIES = [
   "Outros",
 ];
 
+// helper gerador de ids no escopo do módulo (evita chamadas impuras durante o render)
+const generateId = () =>
+  `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
 export default function ExpensesClient() {
   const storageKey = "jrcomposto:expenses";
-
-  // lazy init from localStorage to avoid setState in effect
-  const [income, setIncome] = useState<number>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return 0;
-      const parsed = JSON.parse(raw);
-      return typeof parsed.income === "number" ? parsed.income : 0;
-    } catch {
-      return 0;
-    }
-  });
-  const [savingGoal, setSavingGoal] = useState<number>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return 0;
-      const parsed = JSON.parse(raw);
-      return typeof parsed.savingGoal === "number" ? parsed.savingGoal : 0;
-    } catch {
-      return 0;
-    }
-  });
-  const [name, setName] = useState("");
-  const [amount, setAmount] = useState<string>("");
-  const [category, setCategory] = useState("");
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed.expenses)
-        ? parsed.expenses.map((e: Expense) => {
-            // inline normalization (não depende da função declarada abaixo)
-            const raw = e.category;
-            const normalized = raw
-              ? (() => {
-                  const cleaned = raw
-                    .toString()
-                    .trim()
-                    .toLowerCase()
-                    .normalize("NFD")
-                    .replace(/\p{Diacritic}/gu, "")
-                    .replace(/[^a-z0-9\s]/g, "")
-                    .replace(/\s+/g, " ")
-                    .trim();
-                  const map: Record<string, string> = {
-                    alimentacao: "Alimentação",
-                    alimenta: "Alimentação",
-                    transporte: "Transporte",
-                    assinatura: "Assinaturas",
-                    assinaturas: "Assinaturas",
-                    lazer: "Lazer",
-                    moradia: "Moradia",
-                    casa: "Moradia",
-                    saude: "Saúde",
-                    saudee: "Saúde",
-                    educacao: "Educação",
-                    educacaoes: "Educação",
-                    compras: "Compras",
-                    outros: "Outros",
-                  };
-                  if (map[cleaned]) return map[cleaned];
-                  for (const k of Object.keys(map)) {
-                    if (cleaned.startsWith(k)) return map[k];
-                  }
-                  return raw
-                    .toString()
-                    .trim()
-                    .replace(/\s+/g, " ")
-                    .split(" ")
-                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                    .join(" ");
-                })()
-              : undefined;
-            return { ...e, category: normalized };
-          })
-        : [];
-    } catch {
-      return [];
-    }
-  });
-
-  // persist to localStorage whenever income, expenses or savingGoal change
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify({ income, expenses, savingGoal })
-      );
-    } catch {
-      // ignore
-    }
-  }, [income, expenses, savingGoal]);
-
   // normalização de categoria: remove acentos, espaços e mapeia sinônimos para categorias canônicas
-  const normalizeCategory = (input?: string | null) => {
+  function normalizeCategory(input?: string | null) {
     if (!input) return undefined;
     const cleaned = input
       .toString()
@@ -185,7 +105,87 @@ export default function ExpensesClient() {
       .split(" ")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ");
-  };
+  }
+
+  // lazy init from localStorage to avoid setState in effect
+  const [income, setIncome] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw);
+      return typeof parsed.income === "number" ? parsed.income : 0;
+    } catch {
+      return 0;
+    }
+  });
+  const [savingGoal, setSavingGoal] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw);
+      return typeof parsed.savingGoal === "number" ? parsed.savingGoal : 0;
+    } catch {
+      return 0;
+    }
+  });
+  const [name, setName] = useState("");
+  const [amount, setAmount] = useState<string>("");
+  const [category, setCategory] = useState("");
+  const [recurringChecked, setRecurringChecked] = useState(false);
+  const [paymentDay, setPaymentDay] = useState<number>(() =>
+    new Date().getDate()
+  );
+  const [showConfirmApplyAll, setShowConfirmApplyAll] = useState(false);
+  const [showInfoApplyAll, setShowInfoApplyAll] = useState(false);
+  const [expenses, setExpenses] = useState<Expense[]>(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      const expensesRaw = Array.isArray(parsed.expenses) ? parsed.expenses : [];
+      return expensesRaw.map((e: Expense) => ({
+        ...e,
+        category: e.category ? normalizeCategory(e.category) : undefined,
+      }));
+    } catch {
+      return [];
+    }
+  });
+
+  const [recurringExpenses, setRecurringExpenses] = useState<
+    RecurringExpense[]
+  >(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      const recs = Array.isArray(parsed.recurringExpenses)
+        ? parsed.recurringExpenses
+        : [];
+      return recs.map((r: RecurringExpense) => ({
+        ...r,
+        category: r.category ? normalizeCategory(r.category) : undefined,
+        paymentDay:
+          typeof r.paymentDay === "number"
+            ? r.paymentDay
+            : new Date().getDate(),
+      }));
+    } catch {
+      return [];
+    }
+  });
+
+  // persist to localStorage whenever income, expenses, savingGoal or recurringExpenses change
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ income, expenses, savingGoal, recurringExpenses })
+      );
+    } catch {
+      // ignore
+    }
+  }, [income, expenses, savingGoal, recurringExpenses]);
 
   // --- Server sync: load from server on mount ---
   useEffect(() => {
@@ -207,6 +207,13 @@ export default function ExpensesClient() {
         if (typeof server.income === "number") setIncome(server.income);
         if (typeof server.savingGoal === "number")
           setSavingGoal(server.savingGoal);
+        if (Array.isArray(server.recurringExpenses))
+          setRecurringExpenses(
+            server.recurringExpenses.map((r: RecurringExpense) => ({
+              ...r,
+              category: r.category ? normalizeCategory(r.category) : undefined,
+            }))
+          );
       } catch {
         // ignore
       }
@@ -232,7 +239,12 @@ export default function ExpensesClient() {
         const res = await fetch("/api/user-data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ income, expenses, savingGoal }),
+          body: JSON.stringify({
+            income,
+            expenses,
+            savingGoal,
+            recurringExpenses,
+          }),
         });
         if (res.ok) {
           setSyncStatus("saved");
@@ -249,10 +261,7 @@ export default function ExpensesClient() {
     return () => {
       if (syncTimer.current) window.clearTimeout(syncTimer.current);
     };
-  }, [income, expenses, savingGoal]);
-
-  const generateId = () =>
-    `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  }, [income, expenses, savingGoal, recurringExpenses]);
 
   const formatBRL = (v: number) =>
     new Intl.NumberFormat("pt-BR", {
@@ -268,20 +277,146 @@ export default function ExpensesClient() {
         .replace(",", ".")
     );
     if (!name || !parsed || Number.isNaN(parsed)) return;
-    const e: Expense = {
-      id: generateId(),
-      name: name.trim(),
-      amount: parsed,
-      category: category.trim()
-        ? normalizeCategory(category.trim())
-        : undefined,
-      date: new Date().toISOString(),
-    };
-    setExpenses((s) => [e, ...s]);
+    // se marcada como recorrente, criar template primeiro para referenciar seu id
+    if (recurringChecked) {
+      const r: RecurringExpense = {
+        id: generateId(),
+        name: name.trim(),
+        amount: parsed,
+        category: category.trim()
+          ? normalizeCategory(category.trim())
+          : undefined,
+        cadence: "monthly",
+        paymentDay: Math.min(
+          Math.max(1, Number(paymentDay || new Date().getDate())),
+          31
+        ),
+      };
+      setRecurringExpenses((s) => [r, ...s]);
+      const e: Expense = {
+        id: generateId(),
+        name: name.trim(),
+        amount: parsed,
+        category: category.trim()
+          ? normalizeCategory(category.trim())
+          : undefined,
+        date: new Date().toISOString(),
+        recurringId: r.id,
+      };
+      setExpenses((s) => [e, ...s]);
+      setRecurringChecked(false);
+    } else {
+      const e: Expense = {
+        id: generateId(),
+        name: name.trim(),
+        amount: parsed,
+        category: category.trim()
+          ? normalizeCategory(category.trim())
+          : undefined,
+        date: new Date().toISOString(),
+      };
+      setExpenses((s) => [e, ...s]);
+    }
     setName("");
     setAmount("");
     setCategory("");
   };
+
+  const applyRecurringNow = (id: string) => {
+    const r = recurringExpenses.find((x) => x.id === id);
+    if (!r) return;
+    // calcula a data de ocorrência com base no paymentDay do template
+    const now = new Date();
+    const preferredDay =
+      typeof r.paymentDay === "number" ? r.paymentDay : now.getDate();
+    const getCandidate = (ref: Date, day: number) => {
+      const y = ref.getFullYear();
+      const m = ref.getMonth();
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+      const d = Math.min(Math.max(1, day), daysInMonth);
+      return new Date(y, m, d);
+    };
+    let candidate = getCandidate(now, preferredDay);
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+    if (candidate < todayStart) {
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      candidate = getCandidate(nextMonth, preferredDay);
+    }
+    const e: Expense = {
+      id: generateId(),
+      name: r.name,
+      amount: r.amount,
+      category: r.category,
+      date: candidate.toISOString(),
+      recurringId: r.id,
+    };
+    setExpenses((s) => [e, ...s]);
+  };
+
+  const applyAllRecurring = () => {
+    const now = new Date();
+    const toAdd: Expense[] = [];
+
+    const getCandidate = (ref: Date, day: number) => {
+      const y = ref.getFullYear();
+      const m = ref.getMonth();
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+      const d = Math.min(Math.max(1, day), daysInMonth);
+      return new Date(y, m, d);
+    };
+
+    const sameMonth = (d1: Date, d2: Date) =>
+      d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth();
+
+    for (const r of recurringExpenses) {
+      const preferredDay =
+        typeof r.paymentDay === "number" ? r.paymentDay : now.getDate();
+      let candidate = getCandidate(now, preferredDay);
+      const todayStart = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate()
+      );
+      if (candidate < todayStart) {
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        candidate = getCandidate(nextMonth, preferredDay);
+      }
+
+      const exists = expenses.some((e) => {
+        try {
+          const ed = new Date(e.date);
+          if (e.recurringId && e.recurringId === r.id)
+            return sameMonth(ed, candidate);
+          // fallback: match by name+amount in same month
+          if (!e.recurringId && e.name === r.name && e.amount === r.amount)
+            return sameMonth(ed, candidate);
+          return false;
+        } catch {
+          return false;
+        }
+      });
+
+      if (!exists) {
+        toAdd.push({
+          id: generateId(),
+          name: r.name,
+          amount: r.amount,
+          category: r.category,
+          date: candidate.toISOString(),
+          recurringId: r.id,
+        });
+      }
+    }
+
+    if (toAdd.length > 0) setExpenses((s) => [...toAdd, ...s]);
+  };
+
+  const removeRecurring = (id: string) =>
+    setRecurringExpenses((s) => s.filter((r) => r.id !== id));
 
   const removeExpense = (id: string) =>
     setExpenses((s) => s.filter((e) => e.id !== id));
@@ -723,6 +858,32 @@ export default function ExpensesClient() {
               </button>
             ))}
           </div>
+          <div className="col-span-4 sm:col-span-1 flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input
+                type="checkbox"
+                checked={recurringChecked}
+                onChange={(e) => setRecurringChecked(e.target.checked)}
+                className="w-4 h-4 rounded border-white/10 bg-white/5"
+              />
+              <span>Recorrente (mensal)</span>
+            </label>
+          </div>
+          {recurringChecked && (
+            <div className="col-span-4 sm:col-span-1">
+              <label className="text-sm text-zinc-300">Dia do pagamento</label>
+              <input
+                type="number"
+                min={1}
+                max={31}
+                value={paymentDay}
+                onChange={(e) =>
+                  setPaymentDay(Number(e.target.value || new Date().getDate()))
+                }
+                className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100"
+              />
+            </div>
+          )}
           <div className="col-span-4 md:col-span-1">
             <button
               onClick={addExpense}
@@ -771,6 +932,162 @@ export default function ExpensesClient() {
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      {showConfirmApplyAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowConfirmApplyAll(false)}
+          />
+          <div className="relative z-10 w-full max-w-md rounded-lg bg-white/5 p-6">
+            <h4 className="text-lg font-medium text-white">
+              Confirmar aplicação
+            </h4>
+            <p className="text-sm text-zinc-300 mt-2">
+              Isso irá criar {recurringExpenses.length} lançamentos recorrentes.
+              Deseja continuar?
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setShowConfirmApplyAll(false)}
+                className="px-3 py-2 rounded-md bg-white/5 text-sm text-zinc-200"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmApplyAll(false);
+                  applyAllRecurring();
+                }}
+                className="px-3 py-2 rounded-md bg-emerald-500 text-white text-sm"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showInfoApplyAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowInfoApplyAll(false)}
+          />
+          <div className="relative z-10 w-full max-w-2xl rounded-lg bg-white/5 p-6">
+            <h4 className="text-lg font-medium text-white">
+              Sobre o botão &quot;Aplicar todos&quot;
+            </h4>
+            <div className="text-sm text-zinc-300 mt-3 space-y-2">
+              <p>
+                Ao confirmar, o sistema irá criar lançamentos a partir dos
+                modelos de despesas recorrentes cadastrados. Cada modelo gera um
+                gasto com a data baseada no campo &quot;Dia do pagamento&quot;
+                do modelo.
+              </p>
+              <p>
+                Regras principais:
+                <ul className="list-disc ml-5 mt-1">
+                  <li>
+                    Caso a data já tenha passado neste mês, o lançamento será
+                    criado para o mês seguinte.
+                  </li>
+                  <li>
+                    O sistema tenta evitar duplicatas — ele checa se já existe
+                    um lançamento vinculado ao mesmo modelo para o mesmo mês.
+                    Haverá também uma verificação de fallback por nome + valor.
+                  </li>
+                  <li>
+                    As instâncias criadas ficam ligadas ao modelo via
+                    `recurringId` para facilitar rastreabilidade e futuras
+                    operações (remoção/edição).
+                  </li>
+                </ul>
+              </p>
+              <p>
+                As novas entradas são salvas localmente e sincronizadas com o
+                servidor automaticamente.
+              </p>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setShowInfoApplyAll(false)}
+                className="px-3 py-2 rounded-md bg-emerald-500 text-white text-sm"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Card de despesas recorrentes */}
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md mt-4">
+        <div className="mb-2 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-medium text-white">
+              Despesas recorrentes
+            </h3>
+            <p className="text-xs text-zinc-400">
+              Modelos mensais que você pode aplicar quando quiser.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowConfirmApplyAll(true)}
+              disabled={recurringExpenses.length === 0}
+              className="text-xs rounded-md bg-emerald-500 px-2 py-1 text-white disabled:opacity-40"
+            >
+              Aplicar todos
+            </button>
+            <button
+              aria-label="O que faz Aplicar todos"
+              onClick={() => setShowInfoApplyAll(true)}
+              className="text-xs rounded-full bg-white/6 px-2 py-1 text-zinc-200"
+            >
+              i
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          {recurringExpenses.length === 0 ? (
+            <div className="text-sm text-zinc-400">
+              Nenhuma despesa recorrente cadastrada.
+            </div>
+          ) : (
+            recurringExpenses.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center justify-between rounded-md p-3 bg-white/3"
+              >
+                <div>
+                  <div className="text-sm text-white">
+                    {r.name} — {r.category ?? "-"}
+                  </div>
+                  <div className="text-xs text-zinc-400">
+                    {formatBRL(r.amount)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => applyRecurringNow(r.id)}
+                    className="text-xs rounded-md bg-emerald-500 px-2 py-1 text-white"
+                  >
+                    Aplicar agora
+                  </button>
+                  <button
+                    onClick={() => removeRecurring(r.id)}
+                    className="text-xs rounded-md bg-rose-600 px-2 py-1 text-white"
+                  >
+                    Remover
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
