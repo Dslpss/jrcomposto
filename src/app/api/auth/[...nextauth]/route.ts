@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { connectToDatabase } from "@/lib/mongodb";
-import { User } from "@/models/User";
+import { User, IUser } from "@/models/User";
 import bcrypt from "bcryptjs";
 
 export const authOptions = {
@@ -12,12 +12,12 @@ export const authOptions = {
 				email: { label: "Email", type: "email" },
 				password: { label: "Senha", type: "password" },
 			},
-			async authorize(credentials) {
+            async authorize(credentials) {
 				if (!credentials?.email || !credentials?.password) return null;
 				await connectToDatabase();
-				const user = await User.findOne({ email: credentials.email }).lean();
+                const user = await User.findOne({ email: credentials.email }).lean<IUser & { _id: any }>();
 				if (!user) return null;
-				const ok = await bcrypt.compare(credentials.password, user.passwordHash);
+                const ok = await bcrypt.compare(String(credentials.password), user.passwordHash);
 				if (!ok) return null;
 				return { id: (user as any)._id.toString(), email: user.email, name: user.name ?? undefined };
 			},
