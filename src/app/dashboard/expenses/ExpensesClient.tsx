@@ -137,6 +137,7 @@ export default function ExpensesClient() {
   );
   const [showConfirmApplyAll, setShowConfirmApplyAll] = useState(false);
   const [showInfoApplyAll, setShowInfoApplyAll] = useState(false);
+  const [isAddingExpense, setIsAddingExpense] = useState(false);
   const [expenses, setExpenses] = useState<Expense[]>(() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -270,56 +271,63 @@ export default function ExpensesClient() {
     }).format(v);
 
   const addExpense = () => {
-    const parsed = Number(
-      amount
-        .toString()
-        .replace(/[^0-9.,-]/g, "")
-        .replace(",", ".")
-    );
-    if (!name || !parsed || Number.isNaN(parsed)) return;
-    // se marcada como recorrente, criar template primeiro para referenciar seu id
-    if (recurringChecked) {
-      const r: RecurringExpense = {
-        id: generateId(),
-        name: name.trim(),
-        amount: parsed,
-        category: category.trim()
-          ? normalizeCategory(category.trim())
-          : undefined,
-        cadence: "monthly",
-        paymentDay: Math.min(
-          Math.max(1, Number(paymentDay || new Date().getDate())),
-          31
-        ),
-      };
-      setRecurringExpenses((s) => [r, ...s]);
-      const e: Expense = {
-        id: generateId(),
-        name: name.trim(),
-        amount: parsed,
-        category: category.trim()
-          ? normalizeCategory(category.trim())
-          : undefined,
-        date: new Date().toISOString(),
-        recurringId: r.id,
-      };
-      setExpenses((s) => [e, ...s]);
-      setRecurringChecked(false);
-    } else {
-      const e: Expense = {
-        id: generateId(),
-        name: name.trim(),
-        amount: parsed,
-        category: category.trim()
-          ? normalizeCategory(category.trim())
-          : undefined,
-        date: new Date().toISOString(),
-      };
-      setExpenses((s) => [e, ...s]);
+    if (isAddingExpense) return;
+    setIsAddingExpense(true);
+    try {
+      const parsed = Number(
+        amount
+          .toString()
+          .replace(/[^0-9.,-]/g, "")
+          .replace(",", ".")
+      );
+      if (!name || !parsed || Number.isNaN(parsed)) return;
+      // se marcada como recorrente, criar template primeiro para referenciar seu id
+      if (recurringChecked) {
+        const r: RecurringExpense = {
+          id: generateId(),
+          name: name.trim(),
+          amount: parsed,
+          category: category.trim()
+            ? normalizeCategory(category.trim())
+            : undefined,
+          cadence: "monthly",
+          paymentDay: Math.min(
+            Math.max(1, Number(paymentDay || new Date().getDate())),
+            31
+          ),
+        };
+        setRecurringExpenses((s) => [r, ...s]);
+        const e: Expense = {
+          id: generateId(),
+          name: name.trim(),
+          amount: parsed,
+          category: category.trim()
+            ? normalizeCategory(category.trim())
+            : undefined,
+          date: new Date().toISOString(),
+          recurringId: r.id,
+        };
+        setExpenses((s) => [e, ...s]);
+        setRecurringChecked(false);
+      } else {
+        const e: Expense = {
+          id: generateId(),
+          name: name.trim(),
+          amount: parsed,
+          category: category.trim()
+            ? normalizeCategory(category.trim())
+            : undefined,
+          date: new Date().toISOString(),
+        };
+        setExpenses((s) => [e, ...s]);
+      }
+      setName("");
+      setAmount("");
+      setCategory("");
+    } finally {
+      // pequeno timeout para garantir que o usuário veja o feedback visual
+      window.setTimeout(() => setIsAddingExpense(false), 150);
     }
-    setName("");
-    setAmount("");
-    setCategory("");
   };
 
   const applyRecurringNow = (id: string) => {
@@ -884,14 +892,7 @@ export default function ExpensesClient() {
               />
             </div>
           )}
-          <div className="col-span-4 md:col-span-1">
-            <button
-              onClick={addExpense}
-              className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-sm font-medium text-white"
-            >
-              Adicionar gasto
-            </button>
-          </div>
+          {/* botão removido daqui — realocado abaixo do resumo */}
         </div>
 
         <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-4">
@@ -932,6 +933,72 @@ export default function ExpensesClient() {
               )}
             </div>
           </div>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={addExpense}
+            disabled={
+              isAddingExpense ||
+              !name ||
+              !amount ||
+              Number.isNaN(
+                Number(
+                  amount
+                    .toString()
+                    .replace(/[^0-9.,-]/g, "")
+                    .replace(",", ".")
+                )
+              )
+            }
+            aria-disabled={
+              isAddingExpense ||
+              !name ||
+              !amount ||
+              Number.isNaN(
+                Number(
+                  amount
+                    .toString()
+                    .replace(/[^0-9.,-]/g, "")
+                    .replace(",", ".")
+                )
+              )
+            }
+            className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${
+              isAddingExpense
+                ? "bg-emerald-600 opacity-90"
+                : "bg-emerald-500 hover:bg-emerald-600"
+            } disabled:opacity-50`}
+          >
+            {isAddingExpense ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg
+                  className="animate-spin h-4 w-4 text-white"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeOpacity="0.2"
+                  />
+                  <path
+                    d="M22 12a10 10 0 00-10-10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <span>Adicionando...</span>
+              </span>
+            ) : (
+              "Adicionar gasto"
+            )}
+          </button>
         </div>
       </div>
 
@@ -1034,22 +1101,25 @@ export default function ExpensesClient() {
               Modelos mensais que você pode aplicar quando quiser.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowConfirmApplyAll(true)}
-              disabled={recurringExpenses.length === 0}
-              className="text-xs rounded-md bg-emerald-500 px-2 py-1 text-white disabled:opacity-40"
-            >
-              Aplicar todos
-            </button>
-            <button
-              aria-label="O que faz Aplicar todos"
-              onClick={() => setShowInfoApplyAll(true)}
-              className="text-xs rounded-full bg-white/6 px-2 py-1 text-zinc-200"
-            >
-              i
-            </button>
-          </div>
+          <div />
+        </div>
+
+        {/* toolbar: ações globais para recorrentes */}
+        <div className="mt-2 mb-3 flex items-center justify-end gap-2">
+          <button
+            onClick={() => setShowConfirmApplyAll(true)}
+            disabled={recurringExpenses.length === 0}
+            className="text-xs rounded-md bg-emerald-500 px-2 py-1 text-white disabled:opacity-40"
+          >
+            Aplicar todos
+          </button>
+          <button
+            aria-label="O que faz Aplicar todos"
+            onClick={() => setShowInfoApplyAll(true)}
+            className="text-xs rounded-full bg-white/6 px-2 py-1 text-zinc-200"
+          >
+            i
+          </button>
         </div>
 
         <div className="grid gap-2">
