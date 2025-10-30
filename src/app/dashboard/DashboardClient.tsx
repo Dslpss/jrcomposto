@@ -279,7 +279,7 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
 			<div className="pointer-events-none absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-fuchsia-500/10 blur-3xl" />
 
 			<div className="relative mx-auto max-w-6xl p-6 md:p-10">
-				<div className="mb-6 flex items-center justify-between">
+				<div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<h1 className="text-xl font-semibold text-white">Dashboard</h1>
 					<div className="flex items-center gap-3">
 						<span className="text-sm text-zinc-300">{userEmail}</span>
@@ -315,7 +315,7 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
 								onChange={(e) => updateActive({ name: e.target.value })}
 							/>
 						</div>
-						<div className="flex gap-2">
+					<div className="flex flex-wrap gap-2">
 							<button onClick={handleNew} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-100 backdrop-blur transition hover:bg-white/10">Novo</button>
 							<button onClick={handleDelete} disabled={!active} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-100 backdrop-blur transition hover:bg-white/10 disabled:opacity-60">Excluir</button>
 							<button onClick={exportPdf} className="group relative overflow-hidden rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-500 px-3 py-2 text-sm font-medium text-white shadow-lg transition hover:brightness-110">Exportar PDF</button>
@@ -329,7 +329,7 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
 						{loading ? (
 							<p className="text-sm text-zinc-300">Carregando...</p>
 						) : (
-							<div className="grid grid-cols-2 gap-4">
+							<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 								<div className="col-span-2">
 									<label className="mb-1 block text-sm text-zinc-300">Valor Inicial (R$)</label>
 									<input className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100 outline-none transition focus:border-emerald-400/40 focus:ring-2 focus:ring-emerald-400/20" inputMode="decimal" value={principal} onChange={(e) => updateActive({ principal: e.target.value })} />
@@ -346,7 +346,7 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
 									<label className="mb-1 block text-sm text-zinc-300">Aporte diário (opcional)</label>
 									<input className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100 outline-none transition focus:border-emerald-400/40 focus:ring-2 focus:ring-emerald-400/20" inputMode="decimal" value={aporteDiario} onChange={(e) => updateActive({ aporteDiario: e.target.value })} />
 								</div>
-								<div className="col-span-2 mt-2 flex items-center gap-3">
+								<div className="col-span-2 mt-2 flex flex-wrap items-center gap-3">
 									<button disabled={saving || !active} onClick={handleSave} className="group relative overflow-hidden rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-500 px-3 py-2 text-sm font-medium text-white shadow-lg transition enabled:hover:brightness-110 disabled:opacity-60">
 										<span className="absolute inset-0 -translate-x-full bg-white/20 transition group-hover:translate-x-0" />
 										{saving ? "Salvando..." : "Salvar cenário"}
@@ -359,7 +359,7 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
 
 					<div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
 						<h2 className="mb-4 text-lg font-medium text-white">Resumo</h2>
-						<dl className="grid grid-cols-2 gap-3 text-sm">
+					<dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
 							<div>
 								<dt className="text-zinc-300">Valor inicial</dt>
 								<dd className="font-medium text-zinc-100">{formatBRL(parsed.principal)}</dd>
