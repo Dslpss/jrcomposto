@@ -34,6 +34,7 @@ type Scenario = {
   taxaPercentDia: string;
   dias: string;
   aporteDiario: string;
+  periodicidade?: "dia" | "mes" | "ano";
   updatedAt?: string;
 };
 
@@ -76,6 +77,7 @@ export function DashboardClient({ userName }: { userName: string }) {
   const taxaPercentDia = active?.taxaPercentDia ?? "10";
   const dias = active?.dias ?? "7";
   const aporteDiario = active?.aporteDiario ?? "0";
+  const periodicidade = active?.periodicidade ?? "dia";
 
   useEffect(() => {
     (async () => {
@@ -95,6 +97,7 @@ export function DashboardClient({ userName }: { userName: string }) {
               d.taxaPercentDia != null ? String(d.taxaPercentDia) : "10",
             dias: d.dias != null ? String(d.dias) : "7",
             aporteDiario: d.aporteDiario != null ? String(d.aporteDiario) : "0",
+            periodicidade: "dia",
             updatedAt: new Date().toISOString(),
           };
           setScenarios([one]);
@@ -102,8 +105,12 @@ export function DashboardClient({ userName }: { userName: string }) {
           return;
         }
         const list: Scenario[] = Array.isArray(d.scenarios) ? d.scenarios : [];
-        setScenarios(list);
-        const chosenId = d.currentScenarioId ?? list[0]?.id ?? null;
+        // migração leve: garante periodicidade padrão "dia" se ausente
+        const listWithPeriod = list.map((s) =>
+          s.periodicidade ? s : { ...s, periodicidade: "dia" as const }
+        );
+        setScenarios(listWithPeriod);
+        const chosenId = d.currentScenarioId ?? listWithPeriod[0]?.id ?? null;
         setCurrentScenarioId(chosenId);
         // se o backend trouxe um mapa de dias concluídos, armazena-o e aplica para o cenário atual
         if (d.completedDays && typeof d.completedDays === "object") {
@@ -132,11 +139,11 @@ export function DashboardClient({ userName }: { userName: string }) {
   const parsed = useMemo(() => {
     const principalNum = Number.parseFloat(principal.replace(",", ".")) || 0;
     const taxa =
-      (Number.parseFloat(taxaPercentDia.replace(",", ".")) || 0) / 100;
-    const diasNum = Math.max(0, Math.floor(Number(dias) || 0));
-    const aporte = Number.parseFloat(aporteDiario.replace(",", ".")) || 0;
+      (Number.parseFloat(taxaPercentDia.replace(",", ".")) || 0) / 100; // taxa por passo (dia ou mês)
+    const diasNum = Math.max(0, Math.floor(Number(dias) || 0)); // número de passos (dias ou meses)
+    const aporte = Number.parseFloat(aporteDiario.replace(",", ".")) || 0; // aporte por passo
     return { principal: principalNum, taxa, dias: diasNum, aporte } as const;
-  }, [principal, taxaPercentDia, dias, aporteDiario]);
+  }, [principal, taxaPercentDia, dias, aporteDiario, periodicidade]);
 
   const cronograma: DiaJuros[] = useMemo(() => {
     const linhas: DiaJuros[] = [];
@@ -357,7 +364,7 @@ export function DashboardClient({ userName }: { userName: string }) {
     }).format(n);
   }
 
-  function findRequiredDailyRate(
+  function findRequiredStepRate(
     goal: number,
     principalNum: number,
     aporteNum: number,
@@ -366,9 +373,9 @@ export function DashboardClient({ userName }: { userName: string }) {
     if (diasNum <= 0) return null;
     if (goal <= principalNum) return 0; // já alcançado
 
-    // busca binária no espaço da taxa diária (decimal). taxa pode ser negativa, mas não menor que -0.9999
+    // busca binária no espaço da taxa por passo (decimal). taxa pode ser negativa, mas não menor que -0.9999
     let low = -0.9999;
-    let high = 10; // 1000% ao dia como limite superior razoável
+    let high = 10; // 1000% por passo como limite superior razoável
 
     // se mesmo com high não alcança, retorna null
     const finalHigh = simulateFinal(principalNum, aporteNum, diasNum, high);
@@ -385,8 +392,11 @@ export function DashboardClient({ userName }: { userName: string }) {
 
   // Dados para gráficos
   const chartLabels = useMemo(
-    () => cronograma.map((c) => `Dia ${c.dia}`),
-    [cronograma]
+    () =>
+      cronograma.map((c) =>
+        `${periodicidade === "dia" ? "Dia" : periodicidade === "mes" ? "Mês" : "Ano"} ${c.dia}`
+      ),
+    [cronograma, periodicidade]
   );
   const lineData = useMemo(
     () => ({
@@ -411,13 +421,18 @@ export function DashboardClient({ userName }: { userName: string }) {
       labels: chartLabels,
       datasets: [
         {
-          label: "Juros do dia",
+          label:
+            periodicidade === "dia"
+              ? "Juros do dia"
+              : periodicidade === "mes"
+              ? "Juros do mês"
+              : "Juros do ano",
           data: cronograma.map((c) => c.jurosDoDia),
           backgroundColor: "rgba(6, 182, 212, 0.5)",
         },
       ],
     }),
-    [chartLabels, cronograma]
+    [chartLabels, cronograma, periodicidade]
   );
 
   const chartOptions = {
@@ -451,14 +466,20 @@ export function DashboardClient({ userName }: { userName: string }) {
       return;
     }
 
-    const found = findRequiredDailyRate(
+    const found = findRequiredStepRate(
       goal,
       principalNum,
       aporteNum,
       diasMeta
     );
     if (found === null) {
-      setMetaMsg("Não é possível atingir essa meta com taxa ≤ 1000% a.d.");
+      setMetaMsg(
+        periodicidade === "dia"
+          ? "Não é possível atingir essa meta com taxa ≤ 1000% a.d."
+          : periodicidade === "mes"
+          ? "Não é possível atingir essa meta com taxa ≤ 1000% a.m."
+          : "Não é possível atingir essa meta com taxa ≤ 1000% a.a."
+      );
       return;
     }
     setTaxaRequerida(found);
@@ -502,6 +523,7 @@ export function DashboardClient({ userName }: { userName: string }) {
         taxaPercentDia,
         dias,
         aporteDiario,
+        periodicidade,
         updatedAt: new Date().toISOString(),
       };
       const nextList = scenarios.map((s) => (s.id === active.id ? updated : s));
@@ -525,6 +547,7 @@ export function DashboardClient({ userName }: { userName: string }) {
       taxaPercentDia: "10",
       dias: "7",
       aporteDiario: "0",
+      periodicidade: "dia",
       updatedAt: new Date().toISOString(),
     };
     const nextList = [...scenarios, novo];
@@ -557,23 +580,31 @@ export function DashboardClient({ userName }: { userName: string }) {
   function exportPdf() {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const margin = 40;
-    const title = `Relatório de Juros Compostos - ${active?.name ?? "Cenário"}`;
+      const title = `Relatório de Juros Compostos - ${active?.name ?? "Cenário"}`;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.text(title, margin, 40);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
     doc.text(`Usuário: ${userName}`, margin, 60);
-    doc.text(
-      `Parâmetros: Valor Inicial ${formatBRL(parsed.principal)} | Taxa ${(
-        parsed.taxa * 100
-      ).toLocaleString("pt-BR")} % a.d. | Dias ${
-        parsed.dias
-      } | Aporte diário ${formatBRL(parsed.aporte)}`,
-      margin,
-      80,
-      { maxWidth: 515 }
-    );
+      doc.text(
+        `Parâmetros: Valor Inicial ${formatBRL(parsed.principal)} | Taxa ${(
+          parsed.taxa * 100
+        ).toLocaleString("pt-BR")} % ${
+          periodicidade === "dia" ? "a.d." : periodicidade === "mes" ? "a.m." : "a.a."
+        } | ${
+          periodicidade === "dia" ? "Dias" : periodicidade === "mes" ? "Meses" : "Anos"
+        } ${parsed.dias} | ${
+          periodicidade === "dia"
+            ? "Aporte diário"
+            : periodicidade === "mes"
+            ? "Aporte mensal"
+            : "Aporte anual"
+        } ${formatBRL(parsed.aporte)}`,
+        margin,
+        80,
+        { maxWidth: 515 }
+      );
     doc.text(
       `Resumo: Juros ${formatBRL(totais.totalJuros)} | Aportes ${formatBRL(
         totais.totalAportes
@@ -592,7 +623,13 @@ export function DashboardClient({ userName }: { userName: string }) {
     ]);
     autoTable(doc, {
       startY: 120,
-      head: [["Dia", "Saldo inicial", "Aporte", "Juros do dia", "Saldo final"]],
+      head: [[
+        periodicidade === "dia" ? "Dia" : periodicidade === "mes" ? "Mês" : "Ano",
+        "Saldo inicial",
+        "Aporte",
+        periodicidade === "dia" ? "Juros do dia" : periodicidade === "mes" ? "Juros do mês" : "Juros do ano",
+        "Saldo final",
+      ]],
       body: rows,
       styles: { fontSize: 9 },
       headStyles: { fillColor: [24, 24, 27] },
@@ -840,7 +877,11 @@ export function DashboardClient({ userName }: { userName: string }) {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm text-zinc-300">
-                    Taxa ao dia (%)
+                    {periodicidade === "dia"
+                      ? "Taxa ao dia (%)"
+                      : periodicidade === "mes"
+                      ? "Taxa ao mês (%)"
+                      : "Taxa ao ano (%)"}
                   </label>
                   <input
                     className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100 outline-none transition focus:border-emerald-400/40 focus:ring-2 focus:ring-emerald-400/20"
@@ -853,7 +894,11 @@ export function DashboardClient({ userName }: { userName: string }) {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm text-zinc-300">
-                    Dias
+                    {periodicidade === "dia"
+                      ? "Dias"
+                      : periodicidade === "mes"
+                      ? "Meses"
+                      : "Anos"}
                   </label>
                   <input
                     className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100 outline-none transition focus:border-emerald-400/40 focus:ring-2 focus:ring-emerald-400/20"
@@ -864,7 +909,11 @@ export function DashboardClient({ userName }: { userName: string }) {
                 </div>
                 <div className="col-span-2">
                   <label className="mb-1 block text-sm text-zinc-300">
-                    Aporte diário (opcional)
+                    {periodicidade === "dia"
+                      ? "Aporte diário (opcional)"
+                      : periodicidade === "mes"
+                      ? "Aporte mensal (opcional)"
+                      : "Aporte anual (opcional)"}
                   </label>
                   <input
                     className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100 outline-none transition focus:border-emerald-400/40 focus:ring-2 focus:ring-emerald-400/20"
@@ -874,6 +923,18 @@ export function DashboardClient({ userName }: { userName: string }) {
                       updateActive({ aporteDiario: e.target.value })
                     }
                   />
+                </div>
+                <div className="col-span-2">
+                  <label className="mb-1 block text-sm text-zinc-300">Periodicidade</label>
+                  <select
+                    className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-zinc-100 outline-none transition focus:border-emerald-400/40 focus:ring-2 focus:ring-emerald-400/20"
+                    value={periodicidade}
+                    onChange={(e) => updateActive({ periodicidade: e.target.value as "dia" | "mes" })}
+                  >
+                    <option className="bg-zinc-900" value="dia">Ao dia</option>
+                    <option className="bg-zinc-900" value="mes">Ao mês</option>
+                    <option className="bg-zinc-900" value="ano">Ao ano</option>
+                  </select>
                 </div>
                 <div className="col-span-2 mt-2 flex flex-wrap items-center gap-3">
                   <button
@@ -900,7 +961,13 @@ export function DashboardClient({ userName }: { userName: string }) {
                 </dd>
               </div>
               <div>
-                <dt className="text-zinc-300">Taxa ao dia</dt>
+                <dt className="text-zinc-300">
+                  {periodicidade === "dia"
+                    ? "Taxa ao dia"
+                    : periodicidade === "mes"
+                    ? "Taxa ao mês"
+                    : "Taxa ao ano"}
+                </dt>
                 <dd className="font-medium text-zinc-100">
                   {(parsed.taxa * 100).toLocaleString("pt-BR", {
                     maximumFractionDigits: 6,
@@ -909,7 +976,13 @@ export function DashboardClient({ userName }: { userName: string }) {
                 </dd>
               </div>
               <div>
-                <dt className="text-zinc-300">Dias</dt>
+                <dt className="text-zinc-300">
+                  {periodicidade === "dia"
+                    ? "Dias"
+                    : periodicidade === "mes"
+                    ? "Meses"
+                    : "Anos"}
+                </dt>
                 <dd className="font-medium text-zinc-100">{parsed.dias}</dd>
               </div>
               <div>
@@ -959,7 +1032,11 @@ export function DashboardClient({ userName }: { userName: string }) {
             </div>
             <div>
               <label className="mb-1 block text-sm text-zinc-300">
-                Dias para a meta
+                {periodicidade === "dia"
+                  ? "Dias para a meta"
+                  : periodicidade === "mes"
+                  ? "Meses para a meta"
+                  : "Anos para a meta"}
               </label>
               <input
                 inputMode="numeric"
@@ -982,20 +1059,24 @@ export function DashboardClient({ userName }: { userName: string }) {
               {taxaRequerida !== null && (
                 <div>
                   <p className="text-sm text-zinc-300">
-                    Taxa diária necessária aproximada:
+                    {periodicidade === "dia"
+                      ? "Taxa diária necessária aproximada:"
+                      : periodicidade === "mes"
+                      ? "Taxa mensal necessária aproximada:"
+                      : "Taxa anual necessária aproximada:"}
                   </p>
                   <p className="mb-2 text-lg font-semibold text-emerald-300">
                     {(taxaRequerida * 100).toLocaleString("pt-BR", {
                       maximumFractionDigits: 4,
                     })}
-                    % a.d.
+                    % {periodicidade === "dia" ? "a.d." : periodicidade === "mes" ? "a.m." : "a.a."}
                   </p>
                   <div className="overflow-auto rounded-md border border-white/5 bg-white/3 p-2">
                     <table className="w-full text-sm">
                       <thead className="text-zinc-300 text-left">
                         <tr>
                           <th className="px-2 py-1">Variação</th>
-                          <th className="px-2 py-1">Taxa (a.d.)</th>
+                          <th className="px-2 py-1">Taxa ({periodicidade === "dia" ? "a.d." : periodicidade === "mes" ? "a.m." : "a.a."})</th>
                           <th className="px-2 py-1">Saldo final</th>
                         </tr>
                       </thead>
@@ -1056,7 +1137,11 @@ export function DashboardClient({ userName }: { userName: string }) {
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
             <h2 className="mb-4 text-lg font-medium text-white">
-              Juros por dia
+              {periodicidade === "dia"
+                ? "Juros por dia"
+                : periodicidade === "mes"
+                ? "Juros por mês"
+                : "Juros por ano"}
             </h2>
             <div className="h-64">
               <Bar data={barData} options={chartOptions} />
@@ -1083,10 +1168,10 @@ export function DashboardClient({ userName }: { userName: string }) {
                       )}
                     </button>
                   </th>
-                  <th className="px-4 py-3">Dia</th>
+                  <th className="px-4 py-3">{periodicidade === "dia" ? "Dia" : periodicidade === "mes" ? "Mês" : "Ano"}</th>
                   <th className="px-4 py-3">Saldo inicial</th>
                   <th className="px-4 py-3">Aporte</th>
-                  <th className="px-4 py-3">Juros do dia</th>
+                  <th className="px-4 py-3">{periodicidade === "dia" ? "Juros do dia" : periodicidade === "mes" ? "Juros do mês" : "Juros do ano"}</th>
                   <th className="px-4 py-3">Saldo final</th>
                 </tr>
               </thead>
