@@ -2,6 +2,7 @@
 
 import { signOut } from "next-auth/react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   Chart as ChartJS,
@@ -55,6 +56,7 @@ function formatBRL(value: number) {
 }
 
 export function DashboardClient({ userName }: { userName: string }) {
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -656,30 +658,28 @@ export function DashboardClient({ userName }: { userName: string }) {
             <span className="hidden sm:inline text-sm text-zinc-400">
               Gerencie seus cenários
             </span>
-            <Link href="/dashboard/expenses">
-              <div className="relative ml-2 inline-flex items-center">
-                <button className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-zinc-200 hover:bg-white/10 neon-btn glow">
-                  Gastos
-                </button>
 
-                {/* Ponteiro animado que chama atenção para a página de Gastos (posicionado à direita, apontando para a esquerda) */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="neon-pointer absolute -right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-cyan-300"
-                  aria-hidden
-                >
-                  {/* Seta simples apontando para a esquerda */}
-                  <path d="M19 12H6" />
-                  <path d="M12 19l-7-7 7-7" />
-                </svg>
-              </div>
-            </Link>
+            {/* Navegação */}
+            <nav
+              aria-label="Navegação principal"
+              className="ml-2 hidden md:flex items-center gap-2 rounded-md bg-white/5 p-1 border border-white/10"
+              role="navigation"
+            >
+              <Link href="/dashboard" className={`${pathname?.startsWith("/dashboard/expenses") ? "" : "bg-emerald-500 text-white shadow"} inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-zinc-200 hover:bg-white/10 transition`}> 
+                <span className="inline-block h-2 w-2 rounded-full bg-current/80" />
+                <span>Dashboard</span>
+              </Link>
+              <Link href="/dashboard/expenses" className={`${pathname?.startsWith("/dashboard/expenses") ? "bg-emerald-500 text-white shadow" : ""} inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-zinc-200 hover:bg-white/10 transition`}>
+                <span className="inline-block h-2 w-2 rounded-full bg-current/80" />
+                <span>Gastos</span>
+              </Link>
+            </nav>
+
+            {/* Versão compacta (mobile) */}
+            <div className="md:hidden inline-flex items-center gap-2 ml-2">
+              <Link href="/dashboard" className={`${pathname?.startsWith("/dashboard/expenses") ? "border-white/20" : "bg-emerald-500 text-white"} rounded-md border border-white/10 px-2 py-1 text-xs`}>Dash</Link>
+              <Link href="/dashboard/expenses" className={`${pathname?.startsWith("/dashboard/expenses") ? "bg-emerald-500 text-white" : "border-white/20"} rounded-md border border-white/10 px-2 py-1 text-xs`}>Gastos</Link>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 ml-4 shrink-0">
